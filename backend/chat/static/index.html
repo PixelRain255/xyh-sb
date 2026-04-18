@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Chat Demo</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 900px; margin: 30px auto; padding: 0 16px; }
+    .card { border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+    textarea { width: 100%; min-height: 80px; padding: 8px; }
+    button { padding: 8px 14px; cursor: pointer; margin-right: 8px; }
+    pre { background: #f7f7f7; padding: 12px; border-radius: 6px; white-space: pre-wrap; word-wrap: break-word; }
+    .ok { color: #0b7a0b; }
+    .bad { color: #c1121f; }
+  </style>
+</head>
+<body>
+  <h1>FastAPI AI Chat Demo</h1>
+
+  <div class="card">
+    <h3>模型状态检查</h3>
+    <button id="checkBtn">检查 /model/check</button>
+    <p id="checkSummary"></p>
+    <pre id="checkResult">点击上方按钮开始检查...</pre>
+  </div>
+
+  <div class="card">
+    <h3>聊天测试</h3>
+    <textarea id="messageInput" placeholder="输入你的消息，例如：你好，介绍一下 FastAPI"></textarea>
+    <div style="margin-top: 8px;">
+      <button id="chatBtn">发送到 /chat</button>
+    </div>
+    <p><strong>模型回复：</strong></p>
+    <pre id="chatResult">等待发送...</pre>
+  </div>
+
+  <script>
+    const checkBtn = document.getElementById('checkBtn');
+    const checkResult = document.getElementById('checkResult');
+    const checkSummary = document.getElementById('checkSummary');
+
+    const chatBtn = document.getElementById('chatBtn');
+    const chatResult = document.getElementById('chatResult');
+    const messageInput = document.getElementById('messageInput');
+
+    checkBtn.addEventListener('click', async () => {
+      checkSummary.textContent = '检查中...';
+      checkSummary.className = '';
+      checkResult.textContent = '请求中...';
+
+      try {
+        const res = await fetch('/model/check');
+        const data = await res.json();
+
+        checkResult.textContent = JSON.stringify(data, null, 2);
+        if (data.ok) {
+          checkSummary.textContent = '✅ 模型接口可用';
+          checkSummary.className = 'ok';
+        } else {
+          checkSummary.textContent = `❌ 模型接口异常：${data.error_code || 'UNKNOWN_ERROR'}`;
+          checkSummary.className = 'bad';
+        }
+      } catch (err) {
+        checkSummary.textContent = '❌ 检查失败：后端不可达';
+        checkSummary.className = 'bad';
+        checkResult.textContent = String(err);
+      }
+    });
+
+    chatBtn.addEventListener('click', async () => {
+      const message = messageInput.value.trim();
+      if (!message) {
+        chatResult.textContent = '请先输入消息';
+        return;
+      }
+
+      chatResult.textContent = '请求中...';
+      try {
+        const res = await fetch('/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message })
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+          chatResult.textContent = data.reply ?? '(无回复内容)';
+        } else {
+          chatResult.textContent = JSON.stringify(data, null, 2);
+        }
+      } catch (err) {
+        chatResult.textContent = `请求失败：${String(err)}`;
+      }
+    });
+  </script>
+</body>
+</html>
