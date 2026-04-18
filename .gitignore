@@ -137,29 +137,3 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
-
-# =========================
-# Python / FastAPI
-# =========================
-.venv/
-venv/
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-.python-version
-.pytest_cache/
-.mypy_cache/
-
-# =========================
-# Editor / IDE
-# =========================
-.vscode/
-.idea/
-
-# =========================
-# Temporary uploads / misc
-# =========================
-tmp/
-temp/
-uploads/
