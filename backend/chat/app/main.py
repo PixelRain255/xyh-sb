@@ -2,13 +2,15 @@ import json
 import logging
 import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, AsyncIterator, Dict, List, Optional
+
 
 import httpx
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
+
 from pydantic import BaseModel
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
@@ -117,7 +119,12 @@ def truncate_text(text: str, max_len: int = 400) -> str:
     return raw if len(raw) <= max_len else raw[:max_len] + "...(truncated)"
 
 
+def sse_pack(data: Dict[str, Any]) -> str:
+    return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+
 def extract_stream_chunk_text(event: Dict[str, Any]) -> str:
+
     """从流式事件中提取增量文本。"""
     # Chat Completions stream 常见格式: choices[0].delta.content
     try:
@@ -269,7 +276,16 @@ class ChatResponse(BaseModel):
 
 @app.get("/")
 async def index():
-    return FileResponse(STATIC_DIR / "index.html")
+    index_file = STATIC_DIR / "index.html"
+    if index_file.exists():
+        return FileResponse(index_file)
+    return {
+        "ok": True,
+        "service": "backend-chat",
+        "message": "backend/chat/static/index.html 不存在，请使用前端服务访问页面。",
+        "frontend": "http://127.0.0.1:5188",
+    }
+
 
 
 @app.get("/health")
@@ -371,8 +387,155 @@ async def health_ready():
     }
 
 
+@app.post("/chat/stream")
+async def chat_stream(req: ChatRequest):
+    api_key = os.getenv("OPENAI_API_KEY")
+    base_url = os.getenv("OPENAI_BASE_URL")
+    model = os.getenv("OPENAI_MODEL", "gpt-3.5-turbo")
+
+    if not api_key or not base_url:
+        raise HTTPException(
+            status_code=500,
+            detail="Missing OPENAI_API_KEY or OPENAI_BASE_URL in environment variables.",
+        )
+
+    chat_url = build_chat_completions_url(base_url)
+    responses_url = build_responses_url(base_url)
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+
+    model_candidates = [model, *parse_fallback_models(model)]
+
+    async def event_generator() -> AsyncIterator[str]:
+        logger.info(
+            "[/chat/stream] incoming request | model=%s | candidates=%s | msg_len=%s",
+            model,
+            model_candidates,
+            len(req.message or ""),
+        )
+
+        timeout = httpx.Timeout(60.0, connect=10.0)
+        try:
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                for active_model in model_candidates:
+                    chat_payload: Dict[str, Any] = {
+                        "model": active_model,
+                        "messages": [
+                            {"role": "system", "content": "You are a helpful assistant."},
+                            {"role": "user", "content": req.message},
+                        ],
+                        "temperature": 0.7,
+                    }
+                    responses_payload: Dict[str, Any] = {
+                        "model": active_model,
+                        "input": [
+                            {"role": "system", "content": "You are a helpful assistant."},
+                            {"role": "user", "content": req.message},
+                        ],
+                        "temperature": 0.7,
+                    }
+
+                    use_responses_api = should_use_responses_api(active_model)
+                    attempts = (
+                        [
+                            (responses_url, responses_payload, False, "responses"),
+                            (chat_url, chat_payload, True, "chat"),
+                        ]
+                        if use_responses_api
+                        else [
+                            (chat_url, chat_payload, True, "chat"),
+                            (responses_url, responses_payload, False, "responses"),
+                        ]
+                    )
+
+                    for url, payload, used_chat_api, api_name in attempts:
+                        stream_payload = dict(payload)
+                        stream_payload["stream"] = True
+                        logger.info("[/chat/stream] try %s API | model=%s | url=%s", api_name, active_model, url)
+
+                        try:
+                            async with client.stream("POST", url, headers=headers, json=stream_payload) as resp:
+                                if resp.status_code != 200:
+                                    body = (await resp.aread()).decode("utf-8", errors="ignore")
+                                    code = infer_chat_error_code(resp.status_code, body)
+                                    logger.warning(
+                                        "[/chat/stream] %s API failed | model=%s | status=%s | code=%s | body=%s",
+                                        api_name,
+                                        active_model,
+                                        resp.status_code,
+                                        code,
+                                        truncate_text(body),
+                                    )
+                                    if code == "MODEL_NOT_SUPPORTED":
+                                        continue
+
+                                    yield sse_pack({
+                                        "type": "error",
+                                        "message": format_upstream_error(resp.status_code, body, is_chat=used_chat_api),
+                                    })
+                                    return
+
+                                emitted_any = False
+                                async for raw_line in resp.aiter_lines():
+                                    line = (raw_line or "").strip()
+                                    if not line:
+                                        continue
+                                    if line.startswith("data:"):
+                                        line = line[5:].strip()
+                                    if line == "[DONE]":
+                                        break
+
+                                    try:
+                                        event = json.loads(line)
+                                    except json.JSONDecodeError:
+                                        continue
+
+                                    piece = extract_stream_chunk_text(event)
+                                    if piece:
+                                        emitted_any = True
+                                        yield sse_pack({"type": "delta", "text": piece})
+
+                                if emitted_any:
+                                    logger.info("[/chat/stream] success | model=%s | api=%s", active_model, api_name)
+                                    yield sse_pack({"type": "done"})
+                                    return
+
+                                logger.warning("[/chat/stream] empty stream response | model=%s | api=%s", active_model, api_name)
+
+                        except httpx.TimeoutException:
+                            logger.exception("[/chat/stream] upstream timeout")
+                            yield sse_pack({"type": "error", "message": "Model API request timed out."})
+                            return
+                        except httpx.RequestError as e:
+                            logger.exception("[/chat/stream] upstream request error")
+                            yield sse_pack({"type": "error", "message": f"Failed to call model API: {str(e)}"})
+                            return
+
+                fallback = get_empty_reply_fallback()
+                yield sse_pack({"type": "delta", "text": fallback})
+                yield sse_pack({"type": "done"})
+
+        except Exception as e:
+            logger.exception("Unhandled /chat/stream exception")
+            yield sse_pack({"type": "error", "message": f"CHAT_STREAM_INTERNAL_ERROR: {type(e).__name__}: {str(e)}"})
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
 @app.post("/chat", response_model=ChatResponse)
 async def chat(req: ChatRequest):
+
     api_key = os.getenv("OPENAI_API_KEY")
     base_url = os.getenv("OPENAI_BASE_URL")
     model = os.getenv("OPENAI_MODEL", "gpt-3.5-turbo")
