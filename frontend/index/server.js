@@ -238,17 +238,25 @@ const homeHtml = `<!doctype html>
                         <article class="card" id="ai"><div class="card-head"><h2 class="title">AI Assistant 对话区</h2><div id="statusWrap" class="status status-clickable" data-tip="是否刷新健康状态？"><span id="statusDot" class="dot warn"></span><span id="statusText">后端检测中...</span></div></div><p class="sub">前端交互已完成，未来可直接接入真实模型接口。</p><div id="chatWindow" class="chat-window"></div><div class="chat-input"><input id="chatInput" placeholder="例如：这家公司现金流风险如何？" /><button id="sendBtn">发送</button></div></article>
 
 
-      <article class="card" id="reports"><h2 class="title">最新财报链接</h2><p class="sub">财报数据来自 mock 数据源；已预留“实时更新”扩展能力。</p><div class="toolbar"><span id="reportMeta">总条目：0</span><div><label><input id="autoRefresh" type="checkbox" checked /> 自动刷新</label><button id="reloadBtn">手动刷新</button></div></div><div class="report-panels"><section class="report-panel"><h3>企业财报</h3><small id="enterpriseMeta" class="report-panel-meta">条目：0</small><div id="enterpriseList" class="list"></div></section><section class="report-panel hot"><h3>热门财报</h3><small id="hotMeta" class="report-panel-meta">条目：0</small><div id="hotList" class="list"></div></section><section class="report-panel"><h3>证券财报</h3><small id="securitiesMeta" class="report-panel-meta">条目：0</small><div id="securitiesList" class="list"></div></section></div></article>
+                        <article class="card" id="reports"><h2 class="title">最新财报链接</h2><p class="sub">优先接入 AKShare 实时数据；接口异常时自动回退到本地 mock 数据。首页每列展示 5-10 条（当前最多 8 条）。</p><div class="toolbar"><span id="reportMeta">总条目：0</span><div><label><input id="autoRefresh" type="checkbox" checked /> 自动刷新</label><button id="reloadBtn">手动刷新</button></div></div><div class="report-panels"><section class="report-panel"><h3>企业财报</h3><small id="enterpriseMeta" class="report-panel-meta">展示：0</small><div id="enterpriseList" class="list"></div></section><section class="report-panel hot"><h3>热门财报</h3><small id="hotMeta" class="report-panel-meta">展示：0</small><div id="hotList" class="list"></div></section><section class="report-panel"><h3>证券财报</h3><small id="securitiesMeta" class="report-panel-meta">展示：0</small><div id="securitiesList" class="list"></div></section></div></article>
+
+
     </section>
   </main>
   <footer class="footer"><div class="wrap"><div>© <span id="year"></span> 观数知财 · Data to Wealth Insight</div><div>仅供研究演示，不构成投资建议</div></div></footer>
 <script>
         const API_BASE=${JSON.stringify(API_BASE)};
-    const HEALTH_URL=API_BASE+"/health";
+        const HEALTH_URL=API_BASE+"/health";
     const HEALTH_READY_URL=API_BASE+"/health/ready";
+    const REPORTS_URL=API_BASE+"/reports/latest?limit=60";
+    const REPORTS_PER_COLUMN=8;
 
 
-  const reportService={async fetchLatestReports(){await sleep(250);return [...window.__MOCK_REPORTS__].sort((a,b)=>b.publishedAt.localeCompare(a.publishedAt));}};
+  const reportService={async fetchLatestReports(){try{const resp=await fetch(REPORTS_URL);let data=null;try{data=await resp.json();}catch(_){/* ignore */}if(!resp.ok||!data||!Array.isArray(data.items)){throw new Error((data&&data.detail)?data.detail:"财报接口请求失败");}const normalized=data.items.map((item,idx)=>{const title=String(item.title||"");const type=String(item.type||"");const source=String(item.source||"");const text=title+" "+type+" "+source;const isHot=/快报|预告|热/.test(text);const isSecurities=/证券|券商|研报|策略/.test(text);const category=isHot?"hot":(isSecurities?"securities":"enterprise");return {id:String(item.id||("real-"+idx)),category,title:title||"财报信息",company:String(item.company||"未知公司"),period:String(item.period||"-"),type:type||"财报",source:source||"AKShare",publishedAt:String(item.publishedAt||"-"),url:String(item.url||"https://quote.eastmoney.com/")};});if(normalized.length){return normalized.sort((a,b)=>String(b.publishedAt).localeCompare(String(a.publishedAt)));}throw new Error("empty reports");}catch(err){console.warn("[reports] fallback to mock:",err);await sleep(200);return [...window.__MOCK_REPORTS__].sort((a,b)=>b.publishedAt.localeCompare(a.publishedAt));}}};
+
+  function splitReportsForPanels(reports,maxPerColumn=REPORTS_PER_COLUMN){const pool=[...reports].sort((a,b)=>String(b.publishedAt).localeCompare(String(a.publishedAt)));const usedIds=new Set();const take=(predicate)=>{const picked=[];for(const item of pool){if(picked.length>=maxPerColumn)break;if(usedIds.has(item.id))continue;if(predicate(item)){picked.push(item);usedIds.add(item.id);}}return picked;};const hot=take(item=>item.category==="hot"||/快报|预告|热/.test(String(item.type||"")+" "+String(item.title||"")));const securities=take(item=>item.category==="securities"||/证券|券商|研报|策略/.test(String(item.source||"")+" "+String(item.type||"")+" "+String(item.title||"")));const enterprise=take(item=>item.category==="enterprise");const cols=[enterprise,hot,securities];let cursor=0;for(const item of pool){if(usedIds.has(item.id))continue;let found=false;for(let i=0;i<cols.length;i++){const col=cols[(cursor+i)%cols.length];if(col.length<maxPerColumn){col.push(item);usedIds.add(item.id);cursor=(cursor+i+1)%cols.length;found=true;break;}}if(!found)break;}return {enterprise,hot,securities};}
+
+
                 const aiService={async askOnce(message,signal){
     const resp=await fetch(API_BASE+"/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message}),signal});
 
@@ -360,9 +368,11 @@ const homeHtml = `<!doctype html>
 
     function renderChat(){const box=document.getElementById("chatWindow");box.innerHTML=state.messages.map((m,idx)=>{const isUser=m.role==="user";const roleLabel=isUser?"你":"AI";const isCurrentThinking=!isUser&&state.generating&&idx===state.messages.length-1&&!String(m.content||"").trim();const displayContent=isCurrentThinking?"正在思考":m.content;const bodyHtml=isUser?escapeHtml(displayContent).replaceAll("\\n","<br>"):renderMarkdown(displayContent);const cursorHtml=(!isUser&&state.generating&&idx===state.messages.length-1)?'<span class="typing-cursor" aria-hidden="true"></span>':'';return '<div class="msg '+(isUser?"user":"assistant")+'"><span class="role">'+roleLabel+' · '+m.time+'</span><div class="content">'+bodyHtml+cursorHtml+'</div></div>';}).join("");box.scrollTop=box.scrollHeight;}
 
-  async function loadReports(){const reportMetaEl=document.getElementById("reportMeta");const enterpriseMetaEl=document.getElementById("enterpriseMeta");const hotMetaEl=document.getElementById("hotMeta");const securitiesMetaEl=document.getElementById("securitiesMeta");const enterpriseListEl=document.getElementById("enterpriseList");const hotListEl=document.getElementById("hotList");const securitiesListEl=document.getElementById("securitiesList");const loading='<div style="color:#8c7751;border:1px dashed #d7c09a;border-radius:10px;padding:16px;text-align:center;">加载中...</div>';enterpriseListEl.innerHTML=loading;hotListEl.innerHTML=loading;securitiesListEl.innerHTML=loading;const reports=await reportService.fetchLatestReports();reportMetaEl.textContent="总条目："+reports.length+(reports[0]?(" ｜ 最近更新："+reports[0].publishedAt):"");const enterpriseReports=reports.filter(r=>r.category==="enterprise");const hotReports=reports.filter(r=>r.category==="hot");const securitiesReports=reports.filter(r=>r.category==="securities");enterpriseMetaEl.textContent="条目："+enterpriseReports.length;hotMetaEl.textContent="条目："+hotReports.length;securitiesMetaEl.textContent="条目："+securitiesReports.length;renderReportList(enterpriseListEl,enterpriseReports,"暂无企业财报");renderReportList(hotListEl,hotReports,"暂无热门财报");renderReportList(securitiesListEl,securitiesReports,"暂无证券财报");}
+    async function loadReports(){const reportMetaEl=document.getElementById("reportMeta");const enterpriseMetaEl=document.getElementById("enterpriseMeta");const hotMetaEl=document.getElementById("hotMeta");const securitiesMetaEl=document.getElementById("securitiesMeta");const enterpriseListEl=document.getElementById("enterpriseList");const hotListEl=document.getElementById("hotList");const securitiesListEl=document.getElementById("securitiesList");const loading='<div style="color:#8c7751;border:1px dashed #d7c09a;border-radius:10px;padding:16px;text-align:center;">加载中...</div>';enterpriseListEl.innerHTML=loading;hotListEl.innerHTML=loading;securitiesListEl.innerHTML=loading;const reports=await reportService.fetchLatestReports();const grouped=splitReportsForPanels(reports,REPORTS_PER_COLUMN);reportMetaEl.textContent="总条目："+reports.length+" ｜ 每列最多："+REPORTS_PER_COLUMN+(reports[0]?(" ｜ 最近更新："+reports[0].publishedAt):"");enterpriseMetaEl.textContent="展示："+grouped.enterprise.length;hotMetaEl.textContent="展示："+grouped.hot.length;securitiesMetaEl.textContent="展示："+grouped.securities.length;renderReportList(enterpriseListEl,grouped.enterprise,"暂无企业财报");renderReportList(hotListEl,grouped.hot,"暂无热门财报");renderReportList(securitiesListEl,grouped.securities,"暂无证券财报");}
+
   function renderReportList(container,reports,emptyText){if(!reports.length){container.innerHTML='<div style="color:#8c7751;border:1px dashed #d7c09a;border-radius:10px;padding:16px;text-align:center;">'+escapeHtml(emptyText)+'</div>';return;}container.innerHTML=reports.map(r=>'<article class="item"><div><h3>'+escapeHtml(r.title)+'</h3><p>'+escapeHtml(r.company)+' · '+escapeHtml(r.period)+' · '+escapeHtml(r.type)+'</p><small>发布时间：'+escapeHtml(r.publishedAt)+' ｜ 来源：'+escapeHtml(r.source)+'</small></div><a href="'+r.url+'" target="_blank" rel="noreferrer">查看文件</a></article>').join("");}
-  function startReportAutoRefresh(){stopReportAutoRefresh();if(!state.autoRefresh)return;state.reportTimer=setInterval(loadReports,10000);}function stopReportAutoRefresh(){if(state.reportTimer){clearInterval(state.reportTimer);state.reportTimer=null;}}
+    function startReportAutoRefresh(){stopReportAutoRefresh();if(!state.autoRefresh)return;state.reportTimer=setInterval(loadReports,120000);}function stopReportAutoRefresh(){if(state.reportTimer){clearInterval(state.reportTimer);state.reportTimer=null;}}
+
   function startDynamicTitle(){
     const el=document.getElementById("dynamicTitle");
     if(!el)return;
@@ -454,22 +464,45 @@ const reportsPageHtml = `<!doctype html>
       <div id="reportCatalog" class="list"></div>
     </article>
   </main>
-  <script>
-    window.__REPORT_CATALOG__ = [
+    <script>
+    const API_BASE=${JSON.stringify(API_BASE)};
+    const REPORTS_URL=API_BASE+"/reports/latest?limit=120";
+    const fallbackCatalog=[
       { id:"c1", title:"2025 年度报告", company:"华辰科技", type:"年报", source:"交易所披露", publishedAt:"2026-03-30 19:20", url:"https://example.com/catalog/huachen-2025fy.pdf" },
-      { id:"c2", title:"2026 Q1 财务报告", company:"鼎合能源", type:"季报", source:"企业公告", publishedAt:"2026-04-15 17:10", url:"https://example.com/catalog/dinghe-2026q1.pdf" },
-      { id:"c3", title:"医药行业深度财报综述", company:"申海证券", type:"行业研报", source:"券商研究所", publishedAt:"2026-04-10 09:05", url:"https://example.com/catalog/medical-summary-2026m04.pdf" },
-      { id:"c4", title:"新能源板块估值周报", company:"启明证券", type:"策略周报", source:"券商研究所", publishedAt:"2026-04-13 20:10", url:"https://example.com/catalog/newenergy-weekly-w15.pdf" },
-      { id:"c5", title:"高分红企业名单跟踪", company:"多家公司", type:"专题汇总", source:"平台热榜", publishedAt:"2026-04-12 18:35", url:"https://example.com/catalog/dividend-tracker.pdf" },
-      { id:"c6", title:"消费板块现金流质量观察", company:"和泰消费", type:"专项分析", source:"企业公告", publishedAt:"2026-04-11 16:00", url:"https://example.com/catalog/hetai-cashflow-insight.pdf" }
+      { id:"c2", title:"2026 Q1 财务报告", company:"鼎合能源", type:"季报", source:"企业公告", publishedAt:"2026-04-15 17:10", url:"https://example.com/catalog/dinghe-2026q1.pdf" }
     ];
 
-    const state = { keyword:"", items:[...window.__REPORT_CATALOG__] };
+    const state = { keyword:"", items:[] };
     const searchEl = document.getElementById("reportSearch");
     searchEl.addEventListener("input", (e)=>{
       state.keyword = String(e.target.value || "").trim().toLowerCase();
       renderList();
     });
+
+    async function loadCatalog(){
+      const listEl = document.getElementById("reportCatalog");
+      listEl.innerHTML='<div class="empty">加载中...</div>';
+      try{
+        const resp=await fetch(REPORTS_URL);
+        let data=null;
+        try{data=await resp.json();}catch(_){/* ignore */}
+        if(!resp.ok||!data||!Array.isArray(data.items)) throw new Error("财报接口不可用");
+        state.items=data.items.map((item,idx)=>({
+          id:String(item.id||("real-"+idx)),
+          title:String(item.title||"财报信息"),
+          company:String(item.company||"未知公司"),
+          type:String(item.type||"财报"),
+          source:String(item.source||"AKShare"),
+          publishedAt:String(item.publishedAt||"-"),
+          url:String(item.url||"https://quote.eastmoney.com/")
+        }));
+        if(!state.items.length) state.items=[...fallbackCatalog];
+      }catch(err){
+        console.warn("[reports.html] fallback catalog:",err);
+        state.items=[...fallbackCatalog];
+      }
+      renderList();
+    }
 
     function renderList(){
       const listEl = document.getElementById("reportCatalog");
@@ -490,8 +523,9 @@ const reportsPageHtml = `<!doctype html>
       return String(str).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#39;");
     }
 
-    renderList();
+    loadCatalog();
   </script>
+
 </body>
 </html>`;
 
