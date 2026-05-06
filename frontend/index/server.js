@@ -229,7 +229,7 @@ const homeHtml = `<!doctype html>
   </style>
 </head>
 <body>
-        <header class="nav"><div class="wrap nav-inner"><div class="brand"><span class="brand-main">观数</span><span class="brand-sub">知财</span></div><nav class="menu"><div class="menu-item"><a class="menu-link" href="#hero">首页</a><div class="submenu"><a class="menu-link" href="#ai">AI 助手</a><a class="menu-link" href="#reports">财报速览</a></div></div><div class="menu-item"><a class="menu-link" href="/reports.html">财报大全</a></div></nav></div></header>
+        <header class="nav"><div class="wrap nav-inner"><div class="brand"><span class="brand-main">观数</span><span class="brand-sub">知财</span></div><nav class="menu"><div class="menu-item"><a class="menu-link" href="#hero">首页</a><div class="submenu"><a class="menu-link" href="#ai">AI 助手</a><a class="menu-link" href="#reports">财报速览</a></div></div><div class="menu-item"><a class="menu-link" href="/reports.html">财报大全</a></div><div class="menu-item"><a class="menu-link" href="/vision.html">识图助理</a></div></nav></div></header>
 
 
   <main class="wrap">
@@ -340,6 +340,7 @@ const homeHtml = `<!doctype html>
 
   window.__MOCK_REPORTS__=${JSON.stringify(mockReports)};
         const state={messages:[{role:"assistant",content:"你好，我是你的财务分析助手。你可以问我：盈利能力、估值、风险点或财报解读。",time:now()}],autoRefresh:true,reportTimer:null,generating:false,abortController:null,stopping:false,stopTimer:null};
+
 
 
   document.getElementById("year").textContent=new Date().getFullYear();
@@ -454,7 +455,7 @@ const reportsPageHtml = `<!doctype html>
   </style>
 </head>
 <body>
-  <header class="nav"><div class="wrap nav-inner"><div class="brand"><span class="brand-main">观数</span><span class="brand-sub">知财</span></div><nav class="menu"><div class="menu-item"><a class="menu-link" href="/">首页</a><div class="submenu"><a class="menu-link" href="/#ai">AI 助手</a><a class="menu-link" href="/#reports">财报速览</a></div></div><div class="menu-item"><a class="menu-link active" href="/reports.html">财报大全</a></div></nav></div></header>
+  <header class="nav"><div class="wrap nav-inner"><div class="brand"><span class="brand-main">观数</span><span class="brand-sub">知财</span></div><nav class="menu"><div class="menu-item"><a class="menu-link" href="/">首页</a><div class="submenu"><a class="menu-link" href="/#ai">AI 助手</a><a class="menu-link" href="/#reports">财报速览</a></div></div><div class="menu-item"><a class="menu-link active" href="/reports.html">财报大全</a></div><div class="menu-item"><a class="menu-link" href="/vision.html">识图助理</a></div></nav></div></header>
   <main class="main wrap">
     <article class="card">
       <h1 class="title">财报大全</h1>
@@ -529,15 +530,78 @@ const reportsPageHtml = `<!doctype html>
 </body>
 </html>`;
 
+const visionPageHtml = `<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>识图助理｜观数知财</title>
+  <style>
+    :root{--bg:#efe6d6;--line:#c9b189;--text:#3b3326;--dim:#6f6047}
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,PingFang SC,Microsoft YaHei,sans-serif;background:#efe6d6;color:var(--text)}
+    a{text-decoration:none;color:inherit}
+    .wrap{width:min(1180px,92%);margin:0 auto}
+    .nav{position:sticky;top:0;z-index:20;background:rgba(249,241,228,.95);backdrop-filter:blur(6px);border-bottom:1px solid var(--line)}
+    .nav-inner{height:64px;display:flex;align-items:center;gap:20px}
+    .brand{display:flex;flex-direction:column;align-items:center;justify-content:center;width:46px;height:46px;line-height:1.05;color:#6a5631}
+    .brand-main,.brand-sub{display:block;font-weight:800;font-size:15px}
+    .menu{display:flex;align-items:center;color:#867454;font-size:14px}
+    .menu-item{display:flex;align-items:center;position:relative}
+    .menu-link{display:inline-block;padding:6px 10px;border-radius:8px;transition:transform .18s ease,background-color .18s ease,color .18s ease}
+    .menu-link:hover,.menu-link:focus-visible,.menu-link.active{transform:scale(1.12);background:rgba(184,145,77,.16);color:#6a5631}
+    .submenu{position:static;display:flex;gap:8px;max-width:0;margin-left:0;padding:0;border-radius:10px;border:0 solid #d3b882;background:#f9f1e4;opacity:0;overflow:hidden;pointer-events:none;transition:max-width .24s ease,opacity .2s ease,padding .2s ease,margin-left .2s ease,border-width .2s ease;white-space:nowrap}
+    .menu-item:hover .submenu,.menu-item:focus-within .submenu{max-width:240px;margin-left:8px;padding:6px;border-width:1px;box-shadow:0 10px 24px rgba(92,67,26,.2);opacity:1;pointer-events:auto}
+    .main{padding:18px 0 28px}
+    .card{background:linear-gradient(180deg,#f9f1e4,#f4e8d2);border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:0 8px 24px rgba(92,67,26,.16)}
+    .title{margin:0;color:#5b4b2f}
+    .sub{margin:8px 0 0;color:var(--dim);font-size:14px}
+    .chat-window{margin-top:12px;border:1px solid var(--line);background:#e8dcc7;border-radius:12px;min-height:280px;max-height:380px;overflow:auto;padding:12px;display:flex;flex-direction:column;gap:10px}
+    .msg{max-width:84%;padding:10px 12px;border-radius:10px;border:1px solid transparent}
+    .msg .role{font-size:11px;opacity:.75;margin-bottom:4px;display:block}
+    .msg .content{margin:0;line-height:1.6;font-size:14px;word-break:break-word}
+    .assistant{background:linear-gradient(180deg,#efe2c9,#e8d8bd);border-color:#cdb38a}
+    .user{margin-left:auto;background:linear-gradient(180deg,#e2c793,#d9ba82);border-color:#b8914d}
+    .vision-tools{display:grid;grid-template-columns:auto 1fr auto;gap:8px;margin-top:10px}
+    .vision-upload-btn{height:42px;border:1px dashed #b99756;border-radius:10px;background:#f4e6cb;color:#5b4b2f;padding:0 12px;cursor:pointer}
+    .vision-tools input{height:42px;border:1px solid var(--line);border-radius:10px;background:#f8f1e4;color:var(--text);padding:0 12px;outline:none}
+    .vision-send-btn{height:42px;border:1px solid #b48a3c;border-radius:10px;background:linear-gradient(180deg,#dcc08c,#c8a45a);color:#4e3d1f;padding:0 16px;cursor:pointer;font-weight:600}
+    .upload-tip{margin-top:8px;color:#7f6d4d;font-size:12px}
+    @media (max-width:780px){.vision-tools{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <header class="nav"><div class="wrap nav-inner"><div class="brand"><span class="brand-main">观数</span><span class="brand-sub">知财</span></div><nav class="menu"><div class="menu-item"><a class="menu-link" href="/">首页</a><div class="submenu"><a class="menu-link" href="/#ai">AI 助手</a><a class="menu-link" href="/#reports">财报速览</a></div></div><div class="menu-item"><a class="menu-link" href="/reports.html">财报大全</a></div><div class="menu-item"><a class="menu-link active" href="/vision.html">识图助理</a></div></nav></div></header>
+  <main class="main wrap"><article class="card"><h1 class="title">识图助理</h1><p class="sub">支持文本与图片识别的 AI 助理（当前为演示界面）</p><div id="visionChatWindow" class="chat-window"></div><div class="vision-tools"><button id="visionUploadBtn" class="vision-upload-btn" type="button">上传图片</button><input id="visionInput" placeholder="输入文本，或描述你想识别的图片内容" /><button id="visionSendBtn" class="vision-send-btn" type="button">发送</button></div><input id="visionFileInput" type="file" accept="image/*" style="display:none" /><div class="upload-tip">上传后会在会话中显示占位消息（TODO: connect AI API）</div></article></main>
+<script>
+  const visionState={messages:[{role:"assistant",content:"你好，我是识图助理。你可以先发文本，或上传一张图片进行演示。",time:now()}]};
+  bindVisionEvents();renderVisionChat();
+  function bindVisionEvents(){const sendBtn=document.getElementById("visionSendBtn");const input=document.getElementById("visionInput");const uploadBtn=document.getElementById("visionUploadBtn");const fileInput=document.getElementById("visionFileInput");sendBtn.addEventListener("click",sendVisionMessage);input.addEventListener("keydown",e=>{if(e.key==="Enter")sendVisionMessage();});uploadBtn.addEventListener("click",()=>fileInput.click());fileInput.addEventListener("change",onVisionUpload);}
+  function renderVisionChat(){const box=document.getElementById("visionChatWindow");box.innerHTML=visionState.messages.map(m=>{const isUser=m.role==="user";const roleLabel=isUser?"你":"识图助理";return '<div class="msg '+(isUser?"user":"assistant")+'"><span class="role">'+roleLabel+' · '+m.time+'</span><div class="content">'+escapeHtml(m.content).replaceAll("\\n","<br>")+'</div></div>';}).join("");box.scrollTop=box.scrollHeight;}
+  function sendVisionMessage(){const input=document.getElementById("visionInput");const text=String(input.value||"").trim();if(!text)return;visionState.messages.push({role:"user",content:text,time:now()});input.value="";renderVisionChat();setTimeout(()=>{visionState.messages.push({role:"assistant",content:"收到，我将识别这段文本。",time:now()});renderVisionChat();},260);}
+  function onVisionUpload(event){const file=event&&event.target&&event.target.files&&event.target.files[0]?event.target.files[0]:null;if(!file)return;visionState.messages.push({role:"user",content:"已上传图片："+file.name,time:now()});renderVisionChat();setTimeout(()=>{visionState.messages.push({role:"assistant",content:"收到，我将识别这张图片。",time:now()});renderVisionChat();},260);event.target.value="";}
+  function now(){return new Date().toLocaleTimeString("zh-CN",{hour:"2-digit",minute:"2-digit"});}
+  function escapeHtml(str){return String(str).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#39;");}
+</script>
+</body>
+</html>`;
+
 const server = http.createServer((req, res) => {
-  if (req.url === "/" || req.url === "/index.html") {
+  const pathname = new URL(req.url || "/", `http://${req.headers.host || "127.0.0.1"}`).pathname;
+
+  if (pathname === "/" || pathname === "/index.html") {
     res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
     res.end(homeHtml);
     return;
   }
-  if (req.url === "/reports" || req.url === "/reports.html") {
+  if (pathname === "/reports" || pathname === "/reports.html") {
     res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
     res.end(reportsPageHtml);
+    return;
+  }
+  if (pathname === "/vision" || pathname === "/vision.html") {
+    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+    res.end(visionPageHtml);
     return;
   }
   res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
