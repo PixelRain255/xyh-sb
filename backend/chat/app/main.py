@@ -9,6 +9,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from .api.routes.chat import router as chat_router
 from .api.routes.reports import router as reports_router
 from .api.routes.system import router as system_router
+from .api.routes.vision import router as vision_router
+
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
 
@@ -35,10 +37,15 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+        
     app.include_router(system_router)
     app.include_router(chat_router)
     app.include_router(reports_router)
+    app.include_router(vision_router)
+
     return app
+
+
 
 
 app = create_app()

@@ -109,7 +109,8 @@ def truncate_text(text: str, max_len: int = 400) -> str:
 
 
 def sse_pack(data: Dict[str, Any]) -> str:
-    return f"data: {json.dumps(data, ensure_ascii=False)}\\n\\n"
+    return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
+
 
 
 def extract_stream_chunk_text(event: Dict[str, Any]) -> str:
