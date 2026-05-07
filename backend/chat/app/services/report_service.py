@@ -1,11 +1,17 @@
 import logging
 import math
+import os
+import time
 from datetime import date
 from typing import Any, Dict, List, Optional
+
 
 from fastapi import HTTPException
 
 logger = logging.getLogger(__name__)
+
+_REPORT_CACHE: Dict[str, Dict[str, Any]] = {}
+
 
 try:
     import akshare as ak
@@ -100,15 +106,35 @@ def _build_report_item(row: Any, period: str, report_type: str) -> Dict[str, str
     }
 
 
-async def get_latest_reports(period: Optional[str] = None, limit: int = 20) -> Dict[str, Any]:
+async def get_latest_reports(period: Optional[str] = None, limit: int = 20, refresh: bool = False) -> Dict[str, Any]:
     if ak is None:
         raise HTTPException(status_code=500, detail="AKSHARE_NOT_INSTALLED: pip install akshare")
 
     normalized_period = _normalize_period(period)
     limit = max(1, min(limit, 100))
 
+
+    ttl_seconds = max(10, int(os.getenv("REPORT_CACHE_TTL_SECONDS", "600")))
+    now_ts = time.time()
+    cache_key = normalized_period
+    cache_item = _REPORT_CACHE.get(cache_key)
+
+    if not refresh and cache_item and now_ts - cache_item.get("ts", 0) < ttl_seconds:
+        ordered_cached = cache_item.get("ordered", [])
+        errors_cached = cache_item.get("errors", [])
+        return {
+            "ok": True,
+            "period": normalized_period,
+            "count": len(ordered_cached[:limit]),
+            "items": ordered_cached[:limit],
+            "errors": errors_cached,
+            "cached": True,
+            "cacheAgeSec": int(now_ts - cache_item.get("ts", now_ts)),
+        }
+
     items: List[Dict[str, str]] = []
     errors: List[str] = []
+
 
     try:
         df_bb = ak.stock_yjbb_em(date=normalized_period)
@@ -133,6 +159,11 @@ async def get_latest_reports(period: Optional[str] = None, limit: int = 20) -> D
         dedup.setdefault(item["id"], item)
 
     ordered = sorted(dedup.values(), key=lambda x: x.get("publishedAt", ""), reverse=True)
+    _REPORT_CACHE[cache_key] = {
+        "ts": now_ts,
+        "ordered": ordered,
+        "errors": errors,
+    }
 
     return {
         "ok": True,
@@ -140,4 +171,7 @@ async def get_latest_reports(period: Optional[str] = None, limit: int = 20) -> D
         "count": len(ordered[:limit]),
         "items": ordered[:limit],
         "errors": errors,
+        "cached": False,
+        "cacheAgeSec": 0,
     }
+

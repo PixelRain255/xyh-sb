@@ -229,7 +229,7 @@ const homeHtml = `<!doctype html>
   </style>
 </head>
 <body>
-        <header class="nav"><div class="wrap nav-inner"><div class="brand"><span class="brand-main">观数</span><span class="brand-sub">知财</span></div><nav class="menu"><div class="menu-item"><a class="menu-link" href="#hero">首页</a><div class="submenu"><a class="menu-link" href="#ai">AI 助手</a><a class="menu-link" href="#reports">财报速览</a></div></div><div class="menu-item"><a class="menu-link" href="/reports.html">财报大全</a></div></nav></div></header>
+        <header class="nav"><div class="wrap nav-inner"><div class="brand"><span class="brand-main">观数</span><span class="brand-sub">知财</span></div><nav class="menu"><div class="menu-item"><a class="menu-link" href="#hero">首页</a><div class="submenu"><a class="menu-link" href="#ai">AI 助手</a><a class="menu-link" href="#reports">财报速览</a></div></div><div class="menu-item"><a class="menu-link" href="/reports.html">财报大全</a></div><div class="menu-item"><a class="menu-link" href="/vision.html">图像分析</a></div></nav></div></header>
 
 
   <main class="wrap">
@@ -454,7 +454,7 @@ const reportsPageHtml = `<!doctype html>
   </style>
 </head>
 <body>
-  <header class="nav"><div class="wrap nav-inner"><div class="brand"><span class="brand-main">观数</span><span class="brand-sub">知财</span></div><nav class="menu"><div class="menu-item"><a class="menu-link" href="/">首页</a><div class="submenu"><a class="menu-link" href="/#ai">AI 助手</a><a class="menu-link" href="/#reports">财报速览</a></div></div><div class="menu-item"><a class="menu-link active" href="/reports.html">财报大全</a></div></nav></div></header>
+  <header class="nav"><div class="wrap nav-inner"><div class="brand"><span class="brand-main">观数</span><span class="brand-sub">知财</span></div><nav class="menu"><div class="menu-item"><a class="menu-link" href="/">首页</a><div class="submenu"><a class="menu-link" href="/#ai">AI 助手</a><a class="menu-link" href="/#reports">财报速览</a></div></div><div class="menu-item"><a class="menu-link active" href="/reports.html">财报大全</a></div><div class="menu-item"><a class="menu-link" href="/vision.html">图像分析</a></div></nav></div></header>
   <main class="main wrap">
     <article class="card">
       <h1 class="title">财报大全</h1>
@@ -529,6 +529,294 @@ const reportsPageHtml = `<!doctype html>
 </body>
 </html>`;
 
+const visionPageHtml = `<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>图像分析｜观数知财</title>
+  <style>
+    :root{--bg:#efe6d6;--line:#c9b189;--text:#3b3326;--dim:#6f6047;--card:#f9f1e4}
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,PingFang SC,Microsoft YaHei,sans-serif;background:#efe6d6;color:var(--text)}
+    a{text-decoration:none;color:inherit}
+    .wrap{width:min(1180px,92%);margin:0 auto}
+    .nav{position:sticky;top:0;z-index:20;background:rgba(249,241,228,.95);backdrop-filter:blur(6px);border-bottom:1px solid var(--line)}
+    .nav-inner{height:64px;display:flex;align-items:center;gap:20px}
+    .brand{display:flex;flex-direction:column;align-items:center;justify-content:center;width:46px;height:46px;line-height:1.05;color:#6a5631}
+    .brand-main,.brand-sub{display:block;font-weight:800;font-size:15px}
+    .menu{display:flex;align-items:center;color:#867454;font-size:14px}
+    .menu-item{display:flex;align-items:center;position:relative;padding-right:0}
+    .menu-item::after{display:none}
+    .menu-link{display:inline-block;padding:6px 10px;border-radius:8px;transition:transform .18s ease,background-color .18s ease,color .18s ease}
+    .menu-link:hover,.menu-link:focus-visible,.menu-link.active{transform:scale(1.12);background:rgba(184,145,77,.16);color:#6a5631}
+    .submenu{position:static;display:flex;gap:8px;max-width:0;margin-left:0;padding:0;border-radius:10px;border:0 solid #d3b882;background-color:#f9f1e4;box-shadow:none;backdrop-filter:none;opacity:0;overflow:hidden;pointer-events:none;transform:none;transition:max-width .24s ease,opacity .2s ease,padding .2s ease,margin-left .2s ease,border-width .2s ease;white-space:nowrap}
+    .menu-item:hover .submenu,.menu-item:focus-within .submenu{max-width:240px;margin-left:8px;padding:6px;border-width:1px;box-shadow:0 10px 24px rgba(92,67,26,.2);opacity:1;pointer-events:auto}
+    .main{padding:18px 0 28px}
+    .card{background:linear-gradient(180deg,#f9f1e4,#f4e8d2);border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:0 8px 24px rgba(92,67,26,.16)}
+    .title{margin:0;color:#5b4b2f}
+    .sub{margin:8px 0 0;color:var(--dim);font-size:14px}
+    .chat-window{margin-top:12px;border:1px solid var(--line);border-radius:12px;background:#f8f1e4;padding:12px;min-height:280px;max-height:52vh;overflow:auto;scroll-behavior:smooth}
+    .chat-window.dragover{outline:2px dashed #b48a3c;outline-offset:-6px;background:#f3e6cc}
+    .empty-hint{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;min-height:220px;color:#8a7654}
+    .empty-hint .icon{font-size:42px;line-height:1}
+    .msg{display:flex;flex-direction:column;gap:6px;margin:10px 0;animation:fadeIn .22s ease}
+    .msg .meta{font-size:12px;color:#8a7654}
+    .msg .bubble{max-width:88%;padding:10px 12px;border-radius:12px;white-space:pre-wrap;line-height:1.6}
+    .msg.user{align-items:flex-end}
+    .msg.user .bubble{background:linear-gradient(180deg,#e8d7b3,#dcc08c);border:1px solid #c7a563;color:#4e3d1f}
+    .msg.assistant{align-items:flex-start}
+    .msg.assistant .bubble{background:#fff8ea;border:1px solid #d9c29a;color:#4c3f2b}
+    .controls{display:grid;gap:10px;margin-top:12px}
+    .file-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+    .file-hint{font-size:12px;color:#7f6d4d}
+    textarea{width:100%;min-height:90px;border:1px solid var(--line);border-radius:10px;padding:10px;background:#f8f1e4}
+    input[type="file"]{display:block}
+    .actions{display:flex;gap:10px}
+    button{height:40px;border:1px solid #b48a3c;border-radius:10px;background:linear-gradient(180deg,#dcc08c,#c8a45a);color:#4e3d1f;padding:0 16px;cursor:pointer;transition:all .18s ease}
+    button:hover{transform:translateY(-1px);box-shadow:0 8px 18px rgba(92,67,26,.2)}
+    button.thinking{background:linear-gradient(180deg,#d7c6a0,#c3ac79)}
+    button.stop-hover{background:linear-gradient(180deg,#e7b2a1,#d48c78);border-color:#b66b55;color:#4d261d}
+    button.stop-cooldown{opacity:.75;cursor:not-allowed;box-shadow:none}
+    .typing-cursor{display:inline-block;width:8px;height:1em;background:#8e7c5d;margin-left:3px;border-radius:2px;vertical-align:-2px;animation:blink 1s step-end infinite}
+    @keyframes blink{50%{opacity:0}}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+  </style>
+</head>
+<body>
+  <header class="nav"><div class="wrap nav-inner"><div class="brand"><span class="brand-main">观数</span><span class="brand-sub">知财</span></div><nav class="menu"><div class="menu-item"><a class="menu-link" href="/">首页</a><div class="submenu"><a class="menu-link" href="/#ai">AI 助手</a><a class="menu-link" href="/#reports">财报速览</a></div></div><div class="menu-item"><a class="menu-link" href="/reports.html">财报大全</a></div><div class="menu-item"><a class="menu-link active" href="/vision.html">图像分析</a></div></nav></div></header>
+  <main class="main wrap">
+    <article class="card">
+      <h1 class="title">图像分析</h1>
+      <p class="sub">支持连续对话。首次请上传图片，后续可围绕同一张图继续追问。</p>
+      <div id="visionChat" class="chat-window"></div>
+      <div class="controls">
+        <div class="file-row">
+          <input id="imageFile" type="file" accept="image/*" />
+          <span id="fileHint" class="file-hint">未选择图片（首次发送必须上传）</span>
+        </div>
+        <textarea id="visionPrompt" placeholder="例如：先提取图中关键财务数据，再判断风险点。"></textarea>
+        <div class="actions"><button id="analyzeBtn" type="button">发送</button></div>
+      </div>
+    </article>
+  </main>
+  <script>
+    const API_BASE=${JSON.stringify(API_BASE)};
+    const chatEl=document.getElementById("visionChat");
+    const btn=document.getElementById("analyzeBtn");
+    const fileEl=document.getElementById("imageFile");
+    const fileHintEl=document.getElementById("fileHint");
+    const promptEl=document.getElementById("visionPrompt");
+
+    const state={
+      sending:false,
+      stopping:false,
+      abortController:null,
+      stopTimer:null,
+      selectedFile:null,
+      messages:[
+        {role:"assistant",text:"你好，我是图像分析助手。请先上传一张图片，然后我们可以连续追问。",time:now()},
+        {role:"assistant",text:"示例：上传财报截图后，你可以先问“提取关键指标”，再问“这些指标说明了什么风险？”。",time:now()}
+      ]
+    };
+
+    function now(){return new Date().toLocaleTimeString("zh-CN",{hour:"2-digit",minute:"2-digit"});}
+    function escapeHtml(str){return String(str).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#39;");}
+
+    function renderChat(){
+      const hasUser=state.messages.some(m=>m.role==="user");
+      const emptyHint=hasUser?"":'<div class="empty-hint"><div class="icon">&#128444;</div><div>拖拽图片到此处或使用下方选择器上传</div><div>输入问题后按 Enter 发送，Shift+Enter 换行</div></div>';
+      chatEl.innerHTML=emptyHint+state.messages.map((m,idx)=>{
+        const isTyping=m.role==="assistant"&&state.sending&&idx===state.messages.length-1&&!String(m.text||"").trim();
+        const bubble=escapeHtml(m.text||"").replaceAll("\\n","<br>")+(isTyping?'<span class="typing-cursor" aria-hidden="true"></span>':'');
+        return '<div class="msg '+m.role+'"><div class="meta">'+(m.role==="user"?"你":"AI")+' · '+m.time+'</div><div class="bubble">'+bubble+'</div></div>';
+      }).join("");
+      chatEl.scrollTop=chatEl.scrollHeight;
+    }
+
+    function updateSendButton(){
+      if(!btn)return;
+      if(state.stopping){
+        btn.classList.add("thinking","stop-cooldown");
+        btn.classList.remove("stop-hover");
+        btn.textContent="停止中...";
+        btn.disabled=true;
+        return;
+      }
+      btn.classList.remove("stop-cooldown");
+      if(state.sending){
+        btn.classList.add("thinking");
+        btn.textContent="正在思考";
+        btn.disabled=false;
+      }else{
+        btn.classList.remove("thinking","stop-hover");
+        btn.textContent="发送";
+        btn.disabled=false;
+      }
+    }
+
+    function syncFileHint(){
+      if(state.selectedFile){
+        fileHintEl.textContent='当前图片：'+state.selectedFile.name+'（可继续追问）';
+      }else{
+        fileHintEl.textContent='未选择图片（首次发送必须上传）';
+      }
+    }
+
+    async function runVisionAnalyze(){
+      if(state.stopping)return;
+      if(state.sending){
+        if(state.abortController){
+          state.stopping=true;
+          updateSendButton();
+          state.abortController.abort();
+        }
+        return;
+      }
+
+      const pickedFile=fileEl && fileEl.files && fileEl.files[0];
+      if(pickedFile) state.selectedFile=pickedFile;
+
+      const prompt=String((promptEl && promptEl.value)||"").trim();
+      if(!prompt) return;
+      if(!state.selectedFile){
+        state.messages.push({role:"assistant",text:"请先选择图片后再发送。",time:now()});
+        renderChat();
+        return;
+      }
+
+      state.messages.push({role:"user",text:prompt,time:now()});
+      const assistantMsg={role:"assistant",text:"",time:now()};
+      state.messages.push(assistantMsg);
+      promptEl.value="";
+      state.sending=true;
+      state.abortController=new AbortController();
+      syncFileHint();
+      updateSendButton();
+      renderChat();
+
+      try{
+        const formData=new FormData();
+        formData.append("message", prompt);
+        formData.append("image", state.selectedFile);
+        const controller=state.abortController;
+        const timer=setTimeout(()=>controller.abort(),90000);
+        const resp=await fetch(API_BASE+"/vision/analyze/stream",{method:"POST",body:formData,signal:controller.signal});
+        clearTimeout(timer);
+
+        if(!resp.ok){
+          let detail="图像分析接口调用失败";
+          try{const data=await resp.json();const rawDetail=(data&&data.detail)?data.detail:detail;detail=typeof rawDetail==="string"?rawDetail:JSON.stringify(rawDetail,null,2);}catch(_){ }
+          throw new Error(detail);
+        }
+        if(!resp.body) throw new Error("流式响应为空（resp.body 不可用）");
+
+        const reader=resp.body.getReader();
+        const decoder=new TextDecoder("utf-8");
+        let buffer="";
+
+        function consumeSSEChunk(){
+          const events=buffer.split("\\n\\n");
+          buffer=events.pop()||"";
+          for(const evt of events){
+            const lines=evt.split("\\n");
+            for(const lineRaw of lines){
+              const line=lineRaw.trim();
+              if(!line.startsWith("data:"))continue;
+              const payload=line.slice(5).trim();
+              if(!payload || payload==="[DONE]")continue;
+              const msg=JSON.parse(payload);
+              if(msg.type==="delta" && typeof msg.text==="string") assistantMsg.text += msg.text;
+              else if(msg.type==="error") throw new Error(msg.message||"流式分析失败");
+            }
+          }
+          renderChat();
+        }
+
+        while(true){
+          const {value,done}=await reader.read();
+          if(done)break;
+          buffer += decoder.decode(value,{stream:true});
+          consumeSSEChunk();
+        }
+        buffer += decoder.decode();
+        if(buffer.trim()){
+          if(!buffer.endsWith("\\n\\n")) buffer += "\\n\\n";
+          consumeSSEChunk();
+        }
+        if(!assistantMsg.text.trim()) assistantMsg.text="(空回复)";
+      }catch(err){
+        const aborted=(state.abortController&&state.abortController.signal&&state.abortController.signal.aborted);
+        if(aborted&&state.stopping){
+          if(!assistantMsg.text.trim()) assistantMsg.text="已停止生成。";
+        }else{
+          let msg="未知错误";
+          if(err instanceof Error){
+            msg=err.name==="AbortError"?"请求超时（90秒），请稍后重试":(err.message||String(err));
+          }else if(typeof err==="string") msg=err;
+          assistantMsg.text=["分析失败：",msg].join(String.fromCharCode(10));
+        }
+      }finally{
+        state.sending=false;
+        state.abortController=null;
+        if(state.stopping){
+          if(state.stopTimer)clearTimeout(state.stopTimer);
+          state.stopTimer=setTimeout(()=>{state.stopping=false;state.stopTimer=null;updateSendButton();},700);
+        }else{
+          updateSendButton();
+        }
+        renderChat();
+      }
+    }
+
+    if(btn){
+      btn.disabled=false;
+      btn.addEventListener("click", runVisionAnalyze);
+      btn.addEventListener("mouseenter",()=>{if(state.sending&&!state.stopping){btn.classList.add("stop-hover");btn.textContent="停止生成";}});
+      btn.addEventListener("mouseleave",()=>{if(state.sending&&!state.stopping){btn.classList.remove("stop-hover");btn.textContent="正在思考";}});
+    }
+    if(fileEl){
+      fileEl.addEventListener("change",()=>{const f=fileEl.files&&fileEl.files[0];if(f)state.selectedFile=f;syncFileHint();});
+    }
+    if(promptEl){
+      promptEl.addEventListener("keydown",(e)=>{
+        if(e.key==="Enter" && !e.shiftKey){
+          e.preventDefault();
+          runVisionAnalyze();
+        }
+      });
+    }
+    function applyDroppedFile(file){
+      if(!file || !String(file.type||"").startsWith("image/")) return;
+      state.selectedFile=file;
+      try{
+        const dt=new DataTransfer();
+        dt.items.add(file);
+        fileEl.files=dt.files;
+      }catch(_){ }
+      syncFileHint();
+      state.messages.push({role:"assistant",text:"已载入图片："+file.name+"，可以开始提问。",time:now()});
+      renderChat();
+    }
+
+    if(chatEl){
+      chatEl.addEventListener("dragover",(e)=>{e.preventDefault();chatEl.classList.add("dragover");});
+      chatEl.addEventListener("dragleave",()=>chatEl.classList.remove("dragover"));
+      chatEl.addEventListener("drop",(e)=>{
+        e.preventDefault();
+        chatEl.classList.remove("dragover");
+        const files=e.dataTransfer&&e.dataTransfer.files;
+        if(files&&files[0]) applyDroppedFile(files[0]);
+      });
+    }
+
+    syncFileHint();
+    updateSendButton();
+    renderChat();
+  </script>
+</body>
+</html>`;
+
 const server = http.createServer((req, res) => {
   if (req.url === "/" || req.url === "/index.html") {
     res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
@@ -538,6 +826,11 @@ const server = http.createServer((req, res) => {
   if (req.url === "/reports" || req.url === "/reports.html") {
     res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
     res.end(reportsPageHtml);
+    return;
+  }
+  if (req.url === "/vision" || req.url === "/vision.html") {
+    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+    res.end(visionPageHtml);
     return;
   }
   res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
